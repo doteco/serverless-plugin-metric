@@ -97,10 +97,10 @@ class MetricPlugin {
                      */
                     const metricOption = resource.__metricOption;
                     const resourceName = `${functionName}MetricFilter${metricOption.name}`;
-                    this.registerResource(resourceName, resource);
+                    const normailzedResourceName = this.registerResource(resourceName, resource);
 
                     if (metricOption.alarmActions) {
-                        const alarmResource = this.createAWSAlarmResource(functionName, metricOption)
+                        const alarmResource = this.createAWSAlarmResource(functionName, metricOption, normailzedResourceName)
                         const alarmResourceName = `${functionName}Alarm${metricOption.name}`;
                         this.registerResource(alarmResourceName, alarmResource);
                     }
@@ -183,7 +183,7 @@ class MetricPlugin {
      * @param {MetricOption} metricOptions
      * @returns {AWSAlarmResource}
      */
-    createAWSAlarmResource(functionName, metricOptions) {
+    createAWSAlarmResource(functionName, metricOptions, metricResourceName) {
         const { name, namespace, alarmActions } = metricOptions;
         const stage = this.provider.getStage();
         const metricName = `${functionName}-${name}`;
@@ -195,6 +195,7 @@ class MetricPlugin {
          */
         const resource = {
             Type: 'AWS::CloudWatch::Alarm',
+            DependsOn: metricResourceName,
             Properties: {
                 AlarmName: alarmName,
                 Namespace: namespace || dynamicNamespace,
@@ -225,6 +226,7 @@ class MetricPlugin {
         }
         const normalizedName = this.provider.naming.normalizeNameToAlphaNumericOnly(name);
         this.serverless.service.provider.compiledCloudFormationTemplate.Resources[normalizedName] = resource;
+        return normalizedName;
     }
 }
 
