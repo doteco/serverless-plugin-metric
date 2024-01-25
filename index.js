@@ -47,6 +47,7 @@
  *         - getBar
  *       namespace: "custom/metric" (optional, default: '<serviceName>/<stageName>')
  *       value: (optional, default: 1)
+ *       alarmActions: [ alarmActionArns ] (optional)
  * ```
  */
 class MetricPlugin {
@@ -97,6 +98,12 @@ class MetricPlugin {
                     const metricOption = resource.__metricOption;
                     const resourceName = `${functionName}MetricFilter${metricOption.name}`;
                     this.registerResource(resourceName, resource);
+
+                    if (metricOption.alarmActions) {
+                        const alarmResource = this.createAWSAlarmResource(functionName, metricOption)
+                        const alarmResourceName = `${functionName}Alarm${metricOption.name}`;
+                        this.registerResource(alarmResourceName, alarmResource);
+                    }
                 })
             });
     }
@@ -164,6 +171,42 @@ class MetricPlugin {
                         MetricValue: value
                     }
                 ]
+            }
+        }
+        return resource;
+    }
+
+    /**
+     * AWS compatible metric resource creation.
+     *
+     * @param {string} functionName
+     * @param {MetricOption} metricOptions
+     * @returns {AWSAlarmResource}
+     */
+    createAWSAlarmResource(functionName, metricOptions) {
+        const { name, namespace, alarmActions } = metricOptions;
+        const stage = this.provider.getStage();
+        const metricName = `${functionName}-${name}`;
+        const alarmName = metricName + '-alarm';
+        const dynamicNamespace = `${this.service}/${stage}`;
+
+        /**
+         * @type {AWSMetricFilterResource}
+         */
+        const resource = {
+            Type: 'AWS::CloudWatch::Alarm',
+            Properties: {
+                AlarmName: alarmName,
+                Namespace: namespace || dynamicNamespace,
+                MetricName: metricName,
+                ComparisonOperator: 'GreaterThanThreshold',
+                Statistic: 'SampleCount',
+                Threshold: 0,
+                EvaluationPeriods: 1,
+                Period: 300,
+                TreatMissingData: 'notBreaching',
+                ActionsEnabled: true,
+                AlarmActions: alarmActions
             }
         }
         return resource;
